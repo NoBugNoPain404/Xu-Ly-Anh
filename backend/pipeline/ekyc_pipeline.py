@@ -5,16 +5,19 @@ import numpy as np
 
 from config import CARD_HEIGHT, CARD_WIDTH
 
+from .yolo_field_detector import YoloFieldDetector
 from .enhancer import ImageEnhancer
 from .card_detector import CardDetector
-from .roi_extractor import ROIExtractor
-
+from .ocr_engine import OCREngine
+from .postprocessor import Postprocessor
 
 class EKYCPipeline:
     def __init__(self) -> None:
         self.detector = CardDetector()
-        self.roi_extractor = ROIExtractor()
+        self.field_detector = YoloFieldDetector()
         self.enhancer = ImageEnhancer()
+        self.ocr = OCREngine()
+        self.postprocessor = Postprocessor()
 
     def run(self, image: np.ndarray):
         # 1. Encode image -> bytes (for Roboflow)
@@ -30,13 +33,21 @@ class EKYCPipeline:
         # 4. Enhance image (contrast, sharpness...)
         enhanced = self.enhancer.enhance(card)
 
-        # 5. Extract ROIs (with field-specific padding from config)
-        rois = self.roi_extractor.extract(enhanced)
+        # 5. Detect field crops using Roboflow Workflow
+        rois = self.field_detector.extract(enhanced)
+
+        # 6. OCR nhận diện văn bản thô từ các vùng đã cắt
+        raw_texts = self.ocr.recognize(rois)
+
+        # 7. HẬU XỬ LÝ (Lọc rác, định dạng số, ngày tháng)
+        final_texts = self.postprocessor.process(raw_texts)
 
         return {
             "card": card,
             "enhanced": enhanced,
             "rois": rois,
+            "raw_texts": raw_texts,
+            "texts": final_texts,
         }
 
     # =========================
@@ -48,6 +59,7 @@ class EKYCPipeline:
 
         tl, tr, br, bl = ordered
 
+        # Tính toán kích thước thẻ gốc
         width_top = np.linalg.norm(tr - tl)
         width_bottom = np.linalg.norm(br - bl)
         max_width = int(max(width_top, width_bottom))
@@ -56,21 +68,31 @@ class EKYCPipeline:
         height_left = np.linalg.norm(bl - tl)
         max_height = int(max(height_right, height_left))
 
-        max_width = max(max_width, 1)
-        max_height = max(max_height, 1)
-
+        # --- PHẦN SỬA ĐỔI: THÊM MARGIN ---
+        margin = 30  # Nới rộng mỗi cạnh thêm 30 pixel
+        
+        # Điểm đích mới sẽ không bắt đầu từ (0,0) mà lùi ra ngoài một khoảng margin
         dst = np.array(
             [
-                [0, 0],
-                [max_width - 1, 0],
-                [max_width - 1, max_height - 1],
-                [0, max_height - 1],
+                [margin, margin],                         # Top-left
+                [max_width + margin - 1, margin],          # Top-right
+                [max_width + margin - 1, max_height + margin - 1], # Bottom-right
+                [margin, max_height + margin - 1],         # Bottom-left
             ],
             dtype=np.float32,
         )
+        
+        # Kích thước ảnh mới bao gồm cả phần nới rộng
+        new_width = max_width + 2 * margin
+        new_height = max_height + 2 * margin
 
+        # Tính ma trận biến đổi dựa trên các điểm đã ordered và dst mới
         matrix = cv2.getPerspectiveTransform(ordered, dst)
-        warped = cv2.warpPerspective(image, matrix, (max_width, max_height))
+        
+        # Warp với kích thước mới
+        warped = cv2.warpPerspective(image, matrix, (new_width, new_height))
+        
+        # Resize về kích thước chuẩn định nghĩa trong config (giữ tỉ lệ thẻ)
         warped = cv2.resize(
             warped,
             (CARD_WIDTH, CARD_HEIGHT),
