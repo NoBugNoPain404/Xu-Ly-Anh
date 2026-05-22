@@ -13,14 +13,6 @@ from config import (
 
 
 class ROIExtractor:
-    """Extract text ROIs robustly despite small warp errors.
-
-    Perspective correction can still leave 1-3 px alignment drift and a slight
-    residual skew. The skew error often accumulates from top to bottom of the
-    card, so lower fields are more likely to be clipped. For that reason each
-    field uses dedicated padding, with larger bottom-side padding for multiline
-    regions like full_name, home_town, and address.
-    """
 
     def extract(self, image: np.ndarray) -> dict[str, np.ndarray]:
         """Crop all configured ROI fields from a rectified grayscale image."""

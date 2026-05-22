@@ -1,4 +1,5 @@
 from __future__ import annotations
+from venv import logger
 
 import cv2
 import numpy as np
@@ -41,6 +42,10 @@ class EKYCPipeline:
 
         # 7. HẬU XỬ LÝ (Lọc rác, định dạng số, ngày tháng)
         final_texts = self.postprocessor.process(raw_texts)
+
+        print("Raw OCR outputs:", raw_texts)
+
+        print("Final extracted data:", final_texts)
 
         return {
             "card": card,

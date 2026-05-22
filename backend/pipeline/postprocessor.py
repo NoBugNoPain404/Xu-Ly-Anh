@@ -11,8 +11,6 @@ class Postprocessor:
     _ID_PATTERN = re.compile(r"\d{12}")
     _DATE_PATTERN = re.compile(r"\d{1,2}[\s\/\-\.]\d{1,2}[\s\/\-\.]\d{4}")
     _NATIONALITY_PATTERN = re.compile(r"Vi[eệ]t", re.IGNORECASE)
-    _MALE_PATTERN = re.compile(r"\bNam\b", re.IGNORECASE)
-    _FEMALE_PATTERN = re.compile(r"N[uưữ]", re.IGNORECASE)
     
     _NAME_NOISE_EXACT = frozenset(
         {"ho", "va", "ten", "họ", "tên", "no", "so", "số", "name", "full"}
@@ -103,13 +101,29 @@ class Postprocessor:
         except ValueError:
             return ""
 
+    def _clean_text(self, text: str) -> str:
+        text = unicodedata.normalize('NFKD', str(text)).encode('ASCII', 'ignore').decode('utf-8')
+        return re.sub(r'[^a-z]', '', text.lower())
+
     def _extract_gender(self, text: str) -> str:
         if not text: return ""
-        value = str(text).upper()
-        if self._MALE_PATTERN.search(value): return "Nam"
         
-        if "N" in value and "M" not in value: return "Nu"
-        return ""
+        cleaned = self._clean_text(text)
+        if not cleaned: return ""
+
+        if 'm' in cleaned: return "Nam"
+        if 'u' in cleaned: return "Nu"
+
+        if 'a' in cleaned or 'r' in cleaned: 
+            return "Nam"
+        
+        if 'i' in cleaned or 'v' in cleaned or 'h' in cleaned: 
+            return "Nu"
+
+        if len(cleaned) <= 2: 
+            return "Nu"
+        
+        return "Nam"
 
     def _extract_nationality(self, text: str) -> str:
         value = "" if text is None else str(text)

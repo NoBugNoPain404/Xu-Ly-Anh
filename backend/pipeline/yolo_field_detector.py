@@ -28,7 +28,6 @@ class YoloFieldDetector:
             "nationality": "nationality",
             "origin_place": "home_town",
             "current_place": "address",
-            # Đã xóa expiry_date
         }
 
     def extract(self, image: np.ndarray) -> dict[str, np.ndarray]:
