@@ -9,7 +9,7 @@ logger = logging.getLogger("postprocessor")
 
 class Postprocessor:
     _ID_PATTERN = re.compile(r"\d{12}")
-    _DATE_PATTERN = re.compile(r"\d{1,2}[\s\/\-\.]\d{1,2}[\s\/\-\.]\d{4}")
+    _DATE_PATTERN = re.compile(r"\d{1,2}[\s\/\-\.]?\d{1,2}[\s\/\-\.]?\d{4}")
     _NATIONALITY_PATTERN = re.compile(r"Vi[eệ]t", re.IGNORECASE)
     
     _NAME_NOISE_EXACT = frozenset(
@@ -37,7 +37,6 @@ class Postprocessor:
         raw_addr_2 = raw.get("address_line2", "")
         combined_address = f"{raw_addr_1} {raw_addr_2}".strip()
 
-        # Đã xóa expiry_date khỏi dictionary này
         cleaned = {
             "id_number": self._extract_id(raw.get("id_number", "")),
             "full_name": self._clean_name(raw.get("full_name", "")),
@@ -76,8 +75,11 @@ class Postprocessor:
         return self._normalize(text)
 
     def _extract_date(self, text: str) -> str:
-        if text is None: return ""
+        if not text: 
+            return ""
+            
         substituted = str(text)
+        # Thay thế các lỗi nhận diện ký tự phổ biến của OCR
         substitutions = {
             "O": "0", "o": "0", "l": "1", "I": "1", "S": "5", "s": "5", 
             "A": "4", "B": "8", "G": "6", "Z": "2"
@@ -85,14 +87,16 @@ class Postprocessor:
         for source, target in substitutions.items():
             substituted = substituted.replace(source, target)
 
-        match = self._DATE_PATTERN.search(substituted)
-        if not match: return ""
+        digits_only = re.sub(r"[^0-9]", "", substituted)
 
-        normalized = re.sub(r"[\s\-\.]", "/", match.group())
-        parts = normalized.split("/")
-        if len(parts) != 3: return ""
+        if len(digits_only) < 8:
+            return ""
 
-        day, month, year = parts
+        year = digits_only[-4:]
+        day = digits_only[:2]
+        month_part = digits_only[2:-4]
+        month = month_part[:2]
+
         candidate = f"{int(day):02d}/{int(month):02d}/{year}"
 
         try:
@@ -113,22 +117,26 @@ class Postprocessor:
 
         if 'm' in cleaned: return "Nam"
         if 'u' in cleaned: return "Nu"
-
-        if 'a' in cleaned or 'r' in cleaned: 
-            return "Nam"
-        
-        if 'i' in cleaned or 'v' in cleaned or 'h' in cleaned: 
-            return "Nu"
-
-        if len(cleaned) <= 2: 
-            return "Nu"
+        if 'a' in cleaned or 'r' in cleaned: return "Nam"
+        if 'i' in cleaned or 'v' in cleaned or 'h' in cleaned: return "Nu"
+        if len(cleaned) <= 2: return "Nu"
         
         return "Nam"
 
     def _extract_nationality(self, text: str) -> str:
-        value = "" if text is None else str(text)
-        if self._NATIONALITY_PATTERN.search(value): return "Viet Nam"
-        return self._normalize(value)
+        if not text or str(text).strip() == "":
+            return "Viet Nam"
+            
+        value = str(text)
+        if self._NATIONALITY_PATTERN.search(value): 
+            return "Viet Nam"
+            
+        normalized = self._normalize(value)
+        
+        if not normalized or len(normalized) < 2:
+            return "Viet Nam"
+            
+        return normalized
 
     def _clean_address(self, text: str) -> str:
         if not text: 
@@ -141,24 +149,14 @@ class Postprocessor:
         cleaned = re.sub(r'Q\s*lo\s*ngo\s*v', '', cleaned, flags=re.IGNORECASE) 
         cleaned = cleaned.replace("Ng Quyen", "Ngo Quyen") 
 
-        cleaned = re.sub(r'^(nong|ong|hong|phong|g|ng|n|o)\s*', '', cleaned, flags=re.IGNORECASE)
+
+        cleaned = re.sub(r'^(nong|ong|hong|phong)\b\s*', '', cleaned, flags=re.IGNORECASE)
 
         cleaned = cleaned.replace("Nana", "Nang").replace("Nao", "Ngo")
         cleaned = re.sub(r'\bn[aã]o\s*(\d+)', r'ngo \1', cleaned, flags=re.IGNORECASE)
 
-        cleaned = re.sub(
-            r'S[0Oo6]?\s*(\d+)\s*TT',
-            r'So \1 TT ',
-            cleaned,
-            flags=re.IGNORECASE
-        )
-
-        cleaned = re.sub(
-            r'TT\s*[Oo0]?\s*[Tt][Oo06]+',
-            'TT O to',
-            cleaned,
-            flags=re.IGNORECASE
-        )
+        cleaned = re.sub(r'S[0Oo6]?\s*(\d+)\s*TT', r'So \1 TT ', cleaned, flags=re.IGNORECASE)
+        cleaned = re.sub(r'TT\s*[Oo0]?\s*[Tt][Oo06]+', 'TT O to', flags=re.IGNORECASE, string=cleaned)
         
         for noise in self._ADDRESS_NOISE_SUBSTRINGS:
             cleaned = re.sub(re.escape(noise), "", cleaned, flags=re.IGNORECASE)

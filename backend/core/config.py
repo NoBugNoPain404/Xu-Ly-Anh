@@ -2,8 +2,8 @@ import os
 from dotenv import load_dotenv
 from pathlib import Path
 
-# Load .env cùng thư mục với config.py
-env_path = Path(__file__).resolve().parent / ".env"
+
+env_path = Path(__file__).resolve().parent.parent / ".env"
 load_dotenv(dotenv_path=env_path)
 
 class Config:
@@ -64,13 +64,12 @@ ROI = {
 }
 
 ROI_PADDING = {
-    # Tăng mạnh pad_top và pad_bottom lên 10-15 để hứng chữ bị xê dịch
     "id_number":     (8, 8, 4, 4),   
-    "full_name":     (12, 12, 4, 4), # Nới rộng để không mất tên   
-    "date_of_birth": (10, 10, 4, 4), # Nới rộng để không mất ngày sinh
+    "full_name":     (12, 12, 4, 4), 
+    "date_of_birth": (10, 10, 4, 4), 
     "gender":        (8, 8, 4, 4),
     "nationality":   (8, 8, 4, 4),
-    "home_town":     (15, 12, 4, 4), # Nới rộng mạnh để không mất quê quán
+    "home_town":     (15, 12, 4, 4), 
     "address_line1": (15, 6, 4, 4),  
     "address_line2": (10, 10, 4, 4),   
     "expiry_date":   (10, 10, 6, 4),
@@ -89,6 +88,5 @@ OCR_MIN_HEIGHT_FOR_UPSCALE = 60
 OCR_UPSCALE_FACTOR = 4 
 OCR_BORDER_PAD = 10
 
-# [ĐÃ SỬA] Hạ xuống 0.35 để bắt được các nhãn có font chữ siêu nhỏ hoặc mờ
 OCR_MIN_CONFIDENCE = 0.35 
 ANCHOR_ROI_PAD = 8

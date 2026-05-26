@@ -7,7 +7,7 @@ import numpy as np
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 
 from api.dependencies import validate_upload
-from api.schemas.ekyc_schema import EKYCResponse
+from api.ekyc_schema import EKYCResponse
 from pipeline.ekyc_pipeline import EKYCPipeline
 
 router = APIRouter(prefix="/api/v1", tags=["ekyc"])

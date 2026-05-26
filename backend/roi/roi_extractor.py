@@ -3,7 +3,7 @@ from __future__ import annotations
 import cv2
 import numpy as np
 
-from config import (
+from core.config import (
     ROI,
     ROI_DYNAMIC_PADDING,
     ROI_MULTILINE_EXTRA_BOTTOM,

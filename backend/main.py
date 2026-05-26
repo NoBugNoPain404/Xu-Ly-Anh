@@ -8,8 +8,8 @@ os.environ["FLAGS_use_mkldnn"] = "0"
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from api.routes.ekyc import router as ekyc_router
-from config import Config
+from api.ekyc import router as ekyc_router
+from core.config import Config
 
 app = FastAPI(
     title="eKYC ID Card Scanner",

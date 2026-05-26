@@ -5,14 +5,13 @@ import cv2
 import numpy as np
 from inference_sdk import InferenceHTTPClient
 
-from config import Config
-from utils.exceptions import RoboflowAPIError
+from core.config import Config
+from core.exceptions import RoboflowAPIError
 
 logger = logging.getLogger("yolo_field_detector")
 
 
 class YoloFieldDetector:
-    """Stage 5 detector using standard Roboflow Object Detection inference."""
 
     def __init__(self) -> None:
         self.client = InferenceHTTPClient(

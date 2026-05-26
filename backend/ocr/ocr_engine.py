@@ -6,7 +6,7 @@ import cv2
 import numpy as np
 from paddleocr import PaddleOCR
 
-from config import (
+from core.config import (
     OCR_BORDER_PAD,
     OCR_MIN_CONFIDENCE,
     OCR_MIN_HEIGHT_FOR_UPSCALE,
@@ -17,29 +17,24 @@ from config import (
 logger = logging.getLogger("ocr_engine")
 
 class OCREngine:
-    """Stage 6 OCR using PaddleOCR for robust Vietnamese CCCD text extraction."""
 
     def __init__(self) -> None:
-        # Khởi tạo một lần để dùng nhiều lần
         self._ocr = PaddleOCR(
             lang=OCR_PADDLE_CONFIG["lang"],
-            use_gpu=False,    # Đảm bảo ổn định trên CPU (Fedora)
-            show_log=False    # Tắt log cấu hình khi khởi động
+            use_gpu=False,   
+            show_log=False   
         )
 
     def detect_layout(self, image: np.ndarray) -> list[dict]:
-        """Detect full-card text layout on warped color image using PaddleOCR."""
-        # [SỬA]: Đổi .predict thành .ocr và bật cls=True để nhận diện hướng chữ
         result = self._ocr.ocr(image, cls=True)
         lines: list[dict] = []
 
-        # PaddleOCR trả về list lồng nhau: [[ [box, (text, score)], ... ]]
         if not result or result[0] is None:
             return lines
 
         for line in result[0]:
-            box = line[0]      # Tọa độ 4 góc: [[x,y], [x,y], [x,y], [x,y]]
-            text_info = line[1] # Tuple: (văn bản, độ tự tin)
+            box = line[0]      
+            text_info = line[1] 
             text = text_info[0]
             score = text_info[1]
 
@@ -66,21 +61,16 @@ class OCREngine:
         return sorted(lines, key=lambda line: line["y_center"])
 
     def recognize(self, rois: dict[str, np.ndarray]) -> dict[str, str]:
-        """Recognize raw text for each ROI and keep the pipeline resilient to failures."""
         results: dict[str, str] = {}
 
         for field_name, image in rois.items():
             try:
-                # Tiền xử lý ảnh xám
                 processed = self._prepare_image(field_name, image)
                 
-                # PaddleOCR yêu cầu ảnh 3 kênh (BGR)
                 image_bgr = cv2.cvtColor(processed, cv2.COLOR_GRAY2BGR)
                 
-                # Sửa lỗi: Thay predict bằng ocr(), dùng cls=True để xử lý hướng chữ
                 ocr_result = self._ocr.ocr(image_bgr, cls=True)
                 
-                # Trích xuất văn bản từ kết quả của Paddle
                 results[field_name] = self._extract_text(ocr_result)
             except Exception as error:
                 logger.warning("OCR failed for field '%s': %s", field_name, error)
@@ -98,7 +88,6 @@ class OCREngine:
             image = cv2.resize(
                 image,
                 (int(image.shape[1] * scale), int(h * scale)),
-                # Đổi sang LANCZOS4 để chữ mượt và không bị răng cưa khi phóng to gấp 4 lần
                 interpolation=cv2.INTER_LANCZOS4, 
             )
 
@@ -118,14 +107,11 @@ class OCREngine:
 
         texts: list[str] = []
         
-        # PaddleOCR trả về list lồng nhau, result[0] chứa các dòng nhận diện được
         for line in result[0]:
-            # line[0] là tọa độ box, line[1] là tuple (text, confidence)
             text_info = line[1]
             text = text_info[0]
             score = text_info[1]
             
-            # Lọc kết quả dựa trên độ tự tin (Confidence)
             if text and float(score) >= OCR_MIN_CONFIDENCE:
                 texts.append(str(text).strip())
 
